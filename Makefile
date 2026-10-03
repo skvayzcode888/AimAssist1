@@ -7,6 +7,6 @@ LIBRARY_NAME = AimAssist
 
 AimAssist_FILES = AimAssist.m
 AimAssist_FRAMEWORKS = UIKit Foundation
-AimAssist_CFLAGS = -fobjc-arc
+AimAssist_CFLAGS = -fobjc-arc -Wno-unguarded-availability-new
 
 include $(THEOS_MAKE_PATH)/library.mk
