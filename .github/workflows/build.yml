@@ -7,10 +7,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Theos
+    - name: Install Theos (no SDK auto)
+      env:
+        THEOS_NO_SDK: "1"
       run: |
         bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
         echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+
+    - name: Clone SDKs manually
+      run: |
+        rm -rf $HOME/theos/sdks
+        git clone --depth 1 https://github.com/theos/sdks.git $HOME/theos/sdks
 
     - name: Build Library
       run: |
