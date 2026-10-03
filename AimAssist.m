@@ -48,7 +48,6 @@ static BOOL get_wide (id s, SEL c){ return g_cfg.wide; }
 static BOOL get_ruler(id s, SEL c){ return g_cfg.ruler; }
 static BOOL get_off  (id s, SEL c){ return g_cfg.offlineHide; }
 
-// игра пытается писать своё значение — пишем наше вместо него
 static void set_traj (id s, SEL c, BOOL v){ ((void(*)(id,SEL,BOOL))orig_setTraj)(s,c,g_cfg.trajectory); }
 static void set_wide (id s, SEL c, BOOL v){ ((void(*)(id,SEL,BOOL))orig_setWide)(s,c,g_cfg.wide); }
 static void set_ruler(id s, SEL c, BOOL v){ ((void(*)(id,SEL,BOOL))orig_setRuler)(s,c,g_cfg.ruler); }
@@ -78,13 +77,12 @@ static void installHooks(Class cls) {
     NSLog(@"[AimAssist] hooks installed");
 }
 
-// прогоняем наши значения через сеттеры (сработают callback-и игры)
 static void applyToGame(void) {
     Class cls = objc_getClass("UserSettingsManager");
     if (!cls) return;
     SEL sh = sel_registerName("sharedUserSettingsManager");
-    if (!((id(*)(Class,SEL))objc_msgSend)((Class)cls, sel_registerName("respondsToSelector:")) ? NO : ![cls respondsToSelector:sh]) return;
-    id s = ((id(*)(Class,SEL))objc_msgSend)((Class)cls, sh);
+    if (![cls respondsToSelector:sh]) return;
+    id s = ((id(*)(Class,SEL))objc_msgSend)(cls, sh);
     if (!s) return;
     ((void(*)(id,SEL,BOOL))objc_msgSend)(s, sel_registerName("setShowCueBallTrajectory:"), g_cfg.trajectory);
     ((void(*)(id,SEL,BOOL))objc_msgSend)(s, sel_registerName("setWideGuideline:"),        g_cfg.wide);
@@ -92,14 +90,14 @@ static void applyToGame(void) {
     ((void(*)(id,SEL,BOOL))objc_msgSend)(s, sel_registerName("setNoGuidelinesOffline:"),  g_cfg.offlineHide);
 }
 
-#pragma mark - Окно-призрак (тачи мимо меню уходят в игру)
+#pragma mark - Окно-призрак
 
 @interface AAWindow : UIWindow
 @end
 @implementation AAWindow
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *v = [super hitTest:point withEvent:event];
-    if (v == self.rootViewController.view) return nil; // прозрачная подложка -> игра
+    if (v == self.rootViewController.view) return nil;
     return v;
 }
 @end
@@ -120,15 +118,24 @@ static void applyToGame(void) {
 
 - (void)show {
     if (self.win) return;
+    
     UIWindowScene *scene = nil;
-    for (UIScene *sc in [UIApplication sharedApplication].connectedScenes) {
-        if ([sc isKindOfClass:[UIWindowScene class]]) {
-            scene = (UIWindowScene*)sc;
-            if (sc.activationState == UISceneActivationStateForegroundActive) break;
+    if (@available(iOS 13.0, *)) {
+        for (UIScene *sc in [UIApplication sharedApplication].connectedScenes) {
+            if ([sc isKindOfClass:[UIWindowScene class]]) {
+                scene = (UIWindowScene*)sc;
+                if (sc.activationState == UISceneActivationStateForegroundActive) break;
+            }
         }
     }
-    AAWindow *w = scene ? [[AAWindow alloc] initWithWindowScene:scene]
-                        : [[AAWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    
+    AAWindow *w;
+    if (@available(iOS 13.0, *)) {
+        w = scene ? [[AAWindow alloc] initWithWindowScene:scene]
+                  : [[AAWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    } else {
+        w = [[AAWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    }
     w.windowLevel = UIWindowLevelAlert + 1;
     w.backgroundColor = [UIColor clearColor];
     w.rootViewController = [UIViewController new];
@@ -239,7 +246,7 @@ static void applyToGame(void) {
         case 3: g_cfg.offlineHide = s.on; break;
     }
     cfgSave();
-    applyToGame();   // линии переключаются ПРЯМО в игре, без перезахода
+    applyToGame();
 }
 @end
 
